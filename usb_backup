@@ -1,0 +1,165 @@
+#!/bin/bash 
+#
+# Script to create backups on an encrypted usb pendrive using rsnapshot
+# without requiring root privilieges.
+#
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+# Name of the encrypted partition (LUKS)
+LBL=usb_crypt_349
+
+# location of the key-file
+KEY=/home/josef/.keys/USB
+
+# Location of rsnapshot root
+LOC=/tmp/usb_backup
+
+# Temp file
+
+TMP=/tmp/usb_backup_tmp
+
+
+# function to wait until user presses a key
+function wait_exit {
+    printf "\nPress any key to continue.\n"
+    read -n 1 -s -r 
+    exit
+}
+
+
+printf "\
+====================\n\
+====================\n\
+==== USB backup ====\n\
+====================\n\
+====================\n\
+\n\n"
+
+
+
+# Unlock and mount the usb drive
+##############################################################################
+
+
+while [[ -e $TMP ]] ; do
+    read -p "$TMP already exists, please enter some characters:" IN
+    TMP="$TMP$IN"
+done
+
+
+# Test wether the USB drive exists
+
+if [[ -b "/dev/disk/by-label/$LBL" ]] ; then
+
+    DRV="/dev/disk/by-label/$LBL"
+else 
+
+    if [[ -b "/dev/disk/by-partlabel/$LBL" ]] ; then
+
+	DRV="/dev/disk/by-partlabel/$LBL"
+    else
+
+	echo "$LBL was not found. Aborted backup."
+	wait_exit
+    fi
+fi
+
+
+# Test if LUKS or already unlocked using the output from
+# udisksctl info -b $DRV
+`udisksctl info -b $DRV >> $TMP`
+
+
+# Test if LBL is a LUKS-device
+if [[ `grep -c crypto_LUKS $TMP` -eq 0 ]] ; then
+
+    echo "No LUKS devise. Aborted."
+    wait_exit
+else
+
+    DEV=`grep 'CleartextDevice:' $TMP | sed 's/.*:\s*\(.*\)/\1/'`
+fi
+
+echo "Unlocking $LBL ..."
+# Unlock LBL if it is not already unlocked
+if [[ $DEV == "'/'" ]] ; then
+
+    RAW=`udisksctl unlock -b $DRV --key-file=$KEY`
+    DEV=`echo $RAW | sed 's/.*\/dev\/.*\(\/dev\/.*\)\./\1/'`
+    echo DEV: $DEV
+    if [[ $? -ne 0 ]] ; then
+
+	echo "Error while unlocking $LBL. Aborted."
+	wait_exit
+    else
+	
+	echo "Unlocked $LBL as $DEV."
+    fi
+
+    echo "Unlocked $LBL as $DEV."
+fi
+
+
+RAW=`udisksctl mount -b $DEV`
+RES=$?
+MNT=`echo $RAW | sed 's/.*\(\/media.*\)\./\1/'`
+
+#if [[ $? -eq 0 ]] ; then
+#
+#    MNT=`echo $RAW | sed 's/.*\(\/media.*\)\./\1/'`
+#else
+#    `udisksctl unmount -b $DEV >> /dev/null`
+#
+#    RAW=`udisksctl mount -b $DEV`
+#    echo RAW: $? $RAW
+#    echo $RAW
+#    if [[ $? -eq 0 ]] ; then
+#
+#        MNT=`echo $RAW | sed 's/.*\(\/media.*\)\./\1/'`
+#    else
+#
+#        echo "Unable to mount $LBL. Aborted."
+#        wait_exit
+#    fi
+#    echo "Unable to mount $LBL. Aborted."
+#    wait_exit
+#fi
+
+if [[ $RES -eq 0 ]] ; then
+
+    printf "Mounted $DEV as $MNT.\n\nStarting backup ...\n==== rsnapshot ====\n"
+
+    # symbolic link from the actual mount location to LOC
+    ln -s $MNT $LOC
+    if [[ $? -eq 0 ]] ; then
+
+        rsnapshot -c ~/.config/rsnapshot.conf manual
+        printf "===================\n\n"
+    else
+
+        echo "Could not create sybolic linkt to $MNT at $LOC. Aborted"
+    fi
+
+    rm $LOC
+    udisksctl unmount -b $DEV 
+else
+
+    echo "Failed to mount $LBL. Aborted."    
+fi
+
+udisksctl lock --block-device $DRV
+rm $TMP
+wait_exit
