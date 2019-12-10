@@ -40,11 +40,11 @@ function wait_exit {
 
 
 printf "\
-====================\n\
-====================\n\
-==== USB backup ====\n\
-====================\n\
-====================\n\
+====================================\n\
+====================================\n\
+============ USB backup ============\n\
+====================================\n\
+====================================\n\
 \n\n"
 
 
@@ -97,9 +97,10 @@ echo "Unlocking $LBL ..."
 if [[ $DEV == "'/'" ]] ; then
 
     RAW=`udisksctl unlock -b $DRV --key-file=$KEY`
+    TEST=$?
     DEV=`echo $RAW | sed 's/.*\/dev\/.*\(\/dev\/.*\)\./\1/'`
-    echo DEV: $DEV
-    if [[ $? -ne 0 ]] ; then
+
+    if [[ $TEST -ne 0 ]] ; then
 
 	echo "Error while unlocking $LBL. Aborted."
 	wait_exit
@@ -107,13 +108,14 @@ if [[ $DEV == "'/'" ]] ; then
 	
 	echo "Unlocked $LBL as $DEV."
     fi
+else
 
     echo "Unlocked $LBL as $DEV."
 fi
 
 
 RAW=`udisksctl mount -b $DEV`
-RES=$?
+TEST=$?
 MNT=`echo $RAW | sed 's/.*\(\/media.*\)\./\1/'`
 
 #if [[ $? -eq 0 ]] ; then
@@ -137,7 +139,7 @@ MNT=`echo $RAW | sed 's/.*\(\/media.*\)\./\1/'`
 #    wait_exit
 #fi
 
-if [[ $RES -eq 0 ]] ; then
+if [[ $TEST -eq 0 ]] ; then
 
     printf "Mounted $DEV as $MNT.\n\nStarting backup ...\n==== rsnapshot ====\n"
 
@@ -145,7 +147,7 @@ if [[ $RES -eq 0 ]] ; then
     ln -s $MNT $LOC
     if [[ $? -eq 0 ]] ; then
 
-        rsnapshot -c ~/.config/rsnapshot.conf manual
+        rsnapshot -c ~/.config/usb_backup backup
         printf "===================\n\n"
     else
 

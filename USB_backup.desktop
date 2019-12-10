@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=USB backup
+GenericName=USB backup
+Exec=~/.local/bin/usb_backup
+Terminal=true
+X-MultipleArgs=false
+Type=Application
+Icon=media-removable-symbolic.symbolic
+Categories=Utilities;
