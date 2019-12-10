@@ -19,16 +19,15 @@
 
 
 # Name of the encrypted partition (LUKS)
-LBL=usb_crypt_349
+LBL=NAME
 
 # location of the key-file
-KEY=/home/josef/.keys/USB
+KEY=/PATH/TO/KEY/FILE
 
 # Location of rsnapshot root
 LOC=/tmp/usb_backup
 
-# Temp file
-
+# tmp file
 TMP=/tmp/usb_backup_tmp
 
 
